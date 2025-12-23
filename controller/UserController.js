@@ -1,5 +1,5 @@
-import Gallery from '../models/Gallery.js'
-import Project from '../models/Project.js'
+import Project from '../Model/Project.js'
+import Gallery from '../model/Gallery.js'
 
 export const getAllGalleryItems = async (req, res) => {
   const { category } = req.query

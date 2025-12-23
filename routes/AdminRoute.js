@@ -1,7 +1,12 @@
 import express from 'express'
 import { upload } from '../config/awsS3.js'
-import { adminAuth } from '../middleware/adminAuth.js'
-import { registerAdmin, loginAdmin } from '../controllers/adminAuthController.js'
+import { adminAuth } from '../middleware/auth.js'
+import {
+  registerAdmin,
+  loginAdmin,
+  seedAdmins,
+  changePassword
+} from '../controller/AuthController.js'
 import {
   getGalleryCategories,
   getAllGallery,
@@ -10,7 +15,7 @@ import {
   updateGallery,
   deleteGalleryImage,
   deleteGallery
-} from '../controllers/adminGalleryController.js'
+} from '../controller/GalleryController.js'
 import {
   getProjectCategories,
   getAllProjects,
@@ -19,12 +24,14 @@ import {
   updateProject,
   deleteProjectImage,
   deleteProject
-} from '../controllers/adminProjectController.js'
+} from '../controller/ProjectController.js'
 
 const router = express.Router()
 
+router.post('/seed', seedAdmins)
 router.post('/register', registerAdmin)
 router.post('/login', loginAdmin)
+router.put('/change-password', adminAuth, changePassword)
 
 router.get('/gallery/categories', adminAuth, getGalleryCategories)
 router.get('/gallery', adminAuth, getAllGallery)

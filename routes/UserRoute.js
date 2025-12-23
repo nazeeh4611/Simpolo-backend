@@ -4,7 +4,7 @@ import {
   getGalleryItemById,
   getAllProjects,
   getProjectById
-} from '../controllers/userController.js'
+} from '../controller/UserController.js'
 
 const router = express.Router()
 

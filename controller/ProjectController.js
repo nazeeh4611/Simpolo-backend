@@ -1,4 +1,4 @@
-import Project from '../models/Project.js'
+import Project from '../Model/Project.js'
 import { deleteFromS3 } from '../config/awsS3.js'
 
 const projectCategories = [
@@ -14,7 +14,11 @@ export const getProjectCategories = async (_, res) => {
 }
 
 export const getAllProjects = async (_, res) => {
-  res.json(await Project.find().sort('-createdAt'))
+  const projects = await Project.find().sort('-createdAt')
+  res.json({
+    totalItems: projects.length,
+    projects: projects
+  })
 }
 
 export const getProjectById = async (req, res) => {

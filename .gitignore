@@ -1,3 +1,13 @@
+# Environment variables
 .env
-/.env
-Simpolo/Backend/.env
+
+# Node dependencies
+node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store

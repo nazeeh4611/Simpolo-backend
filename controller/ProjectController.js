@@ -1,5 +1,5 @@
 // controllers/ProjectController.js
-import Project from '../Model/Project.js';
+import Project from '../model/Project.js'
 import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { fromEnv } from '@aws-sdk/credential-provider-env';
 

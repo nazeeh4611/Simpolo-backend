@@ -1,4 +1,4 @@
-import Project from '../Model/Project.js'
+import Project from '../model/Project.js'
 import Gallery from '../model/Gallery.js'
 
 export const getAllGalleryItems = async (req, res) => {

@@ -2,6 +2,7 @@ import Project from '../model/Project.js'
 import Gallery from '../model/Gallery.js'
 
 export const getAllGalleryItems = async (req, res) => {
+  console.log("first")
   const { category } = req.query
   const filter = category ? { category } : {}
   res.json(await Gallery.find(filter).sort('-createdAt'))

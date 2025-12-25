@@ -13,10 +13,10 @@ const PORT = process.env.PORT || 5004
 
 /* ================= CORS CONFIG ================= */
 const allowedOrigins = [
-  'http://localhost:3000',
+  'https://simpolo-sigma.vercel.app/',
   'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  'https://simpolo.vercel.app' // add prod domain
+  'https://simpolotrading.com/',
+  'http://simpolotrading.com/' 
 ]
 
 app.use(

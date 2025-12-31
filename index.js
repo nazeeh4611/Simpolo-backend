@@ -27,6 +27,7 @@ app.use(
       const allowedOrigins = [
         'https://simpolo-sigma.vercel.app',
         'https://simpolotrading.com',
+        'https://www.simpolotrading.com',
         'http://localhost:5173'
       ];
 

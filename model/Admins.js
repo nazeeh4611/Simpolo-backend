@@ -16,6 +16,17 @@ const adminSchema = new mongoose.Schema(
     isDefaultPassword: {
       type: Boolean,
       default: true
+    },
+    name: {
+      type: String,
+      default: 'Admin'
+    },
+    role: {
+      type: String,
+      default: 'admin'
+    },
+    lastLogin: {
+      type: Date
     }
   },
   {

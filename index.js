@@ -1,12 +1,12 @@
+import dotenv from "dotenv";
+dotenv.config();
 import express from 'express'
 import mongoose from 'mongoose'
-import dotenv from 'dotenv'
 import cors from 'cors'
 import adminRoutes from './routes/AdminRoute.js'
 import userRoutes from './routes/UserRoute.js'
 import databaseConnection from './config/Db.js'
 
-dotenv.config()
 
 const app = express()
 const PORT = process.env.PORT || 5004

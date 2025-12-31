@@ -2,6 +2,7 @@
 import Project from '../model/Project.js'
 import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { fromEnv } from '@aws-sdk/credential-provider-env';
+import { uploadToS3 } from '../config/s3Upload.js';
 
 // Initialize S3 client for deletion
 const s3Client = new S3Client({
@@ -121,94 +122,69 @@ export const getProjectById = async (req, res) => {
 // ==========================================
 // CREATE PROJECT (with multer-s3 images)
 // ==========================================
+
+
 export const createProject = async (req, res) => {
   try {
-    console.log('📝 Creating project...');
-    console.log('Request body:', req.body);
-    console.log('Files received:', req.files?.length || 0);
+    console.log("📝 Creating project...");
+    console.log("Files received:", req.files?.length || 0);
 
-    // Validate files
     if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'At least one image is required' 
+        message: "At least one image is required",
       });
     }
 
-    // Extract image URLs from multer-s3 (files already uploaded to S3)
-    const images = req.files.map((file, index) => {
-      console.log(`Processing file ${index}:`, {
-        location: file.location,
-        key: file.key,
-        originalname: file.originalname
+    const images = [];
+
+    for (let i = 0; i < req.files.length; i++) {
+      const uploaded = await uploadToS3(req.files[i], "projects");
+
+      images.push({
+        url: uploaded.url,
+        key: uploaded.key,
+        caption: req.body[`caption_${i}`] || "",
+        order: i,
       });
+    }
 
-      return {
-        url: file.location, // S3 URL from multer-s3
-        key: file.key,      // S3 key from multer-s3
-        caption: req.body[`caption_${index}`] || '',
-        order: index
-      };
-    });
-
-    console.log('Images processed:', images.length);
-
-    // Parse productsUsed if exists
     let productsUsed = [];
     if (req.body.productsUsed) {
-      try {
-        productsUsed = typeof req.body.productsUsed === 'string' 
+      productsUsed =
+        typeof req.body.productsUsed === "string"
           ? JSON.parse(req.body.productsUsed)
           : req.body.productsUsed;
-      } catch (error) {
-        console.error('Error parsing productsUsed:', error);
-        return res.status(400).json({ 
-          success: false,
-          message: 'Invalid productsUsed format',
-          error: error.message 
-        });
-      }
     }
 
-    // Prepare project data
-    const projectData = {
+    const project = await Project.create({
       title: req.body.title,
       client: req.body.client,
       location: req.body.location,
       description: req.body.description,
       category: req.body.category,
-      scope: req.body.scope || '',
+      scope: req.body.scope || "",
       completionDate: req.body.completionDate || null,
-      featured: req.body.featured === 'true' || req.body.featured === true,
+      featured: req.body.featured === "true",
       images,
-      productsUsed
-    };
-
-    console.log('Creating project with data:', {
-      ...projectData,
-      images: `${projectData.images.length} images`
+      productsUsed,
     });
 
-    // Create project
-    const project = await Project.create(projectData);
-    
-    console.log('✅ Project created successfully:', project._id);
-    
     res.status(201).json({
       success: true,
-      message: 'Project created successfully',
-      data: project
+      message: "Project created successfully",
+      data: project,
     });
   } catch (error) {
-    console.error('❌ Error creating project:', error);
-    
-    res.status(500).json({ 
+    console.error("❌ Error creating project:", error);
+    res.status(500).json({
       success: false,
-      message: 'Error creating project',
-      error: error.message 
+      message: "Error creating project",
+      error: error.message,
     });
   }
 };
+
 
 // ==========================================
 // UPDATE PROJECT
@@ -227,18 +203,21 @@ export const updateProject = async (req, res) => {
       });
     }
 
-    // Add new images if provided (multer-s3 already uploaded them)
     if (req.files && req.files.length > 0) {
-      const newImages = req.files.map((file, index) => ({
-        url: file.location,
-        key: file.key,
-        caption: req.body[`caption_${index}`] || '',
-        order: project.images.length + index
-      }));
-
-      project.images.push(...newImages);
-      console.log(`Added ${newImages.length} new images`);
+      for (let i = 0; i < req.files.length; i++) {
+        const uploaded = await uploadToS3(req.files[i], "projects");
+    
+        project.images.push({
+          url: uploaded.url,     // ✅ FULL URL
+          key: uploaded.key,
+          caption: req.body[`caption_${i}`] || '',
+          order: project.images.length
+        });
+      }
+    
+      console.log(`✅ Added ${req.files.length} new images`);
     }
+    
 
     // Update project fields
     project.title = req.body.title;
@@ -249,13 +228,15 @@ export const updateProject = async (req, res) => {
     project.scope = req.body.scope || '';
     project.completionDate = req.body.completionDate || null;
     project.featured = req.body.featured === 'true' || req.body.featured === true;
-
     // Update productsUsed if provided
     if (req.body.productsUsed) {
       try {
+
         project.productsUsed = typeof req.body.productsUsed === 'string'
           ? JSON.parse(req.body.productsUsed)
           : req.body.productsUsed;
+          console.log("mayy")
+
       } catch (error) {
         console.error('Error parsing productsUsed:', error);
         return res.status(400).json({ 

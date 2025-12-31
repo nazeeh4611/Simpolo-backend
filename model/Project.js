@@ -131,7 +131,6 @@ projectSchema.pre('save', function(next) {
     // Sort images by order
     this.images.sort((a, b) => a.order - b.order);
   }
-  next();
 });
 
 const Project = mongoose.model('Project', projectSchema);

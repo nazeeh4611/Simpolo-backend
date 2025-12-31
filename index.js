@@ -21,21 +21,28 @@ const allowedOrigins = [
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // allow requests with no origin (Postman, curl)
-      if (!origin) return callback(null, true)
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+
+      const allowedOrigins = [
+        'https://simpolo-sigma.vercel.app',
+        'https://simpolotrading.com',
+        'http://localhost:5173'
+      ];
 
       if (allowedOrigins.includes(origin)) {
-        callback(null, true)
+        callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'))
+        // IMPORTANT: allow false instead of throwing error
+        callback(null, false);
       }
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
   })
-)
+);
+
 
 /* ================= MIDDLEWARE ================= */
 app.use(express.json())

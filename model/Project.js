@@ -1,4 +1,3 @@
-// models/Project.js
 import mongoose from 'mongoose';
 
 const imageSchema = new mongoose.Schema({
@@ -40,7 +39,7 @@ const productUsedSchema = new mongoose.Schema({
     trim: true,
     default: ''
   }
-}, { _id: true });
+}, { _id: false });
 
 const projectSchema = new mongoose.Schema(
   {
@@ -109,18 +108,15 @@ const projectSchema = new mongoose.Schema(
   }
 );
 
-// Indexes for better query performance
 projectSchema.index({ title: 'text', description: 'text', client: 'text' });
 projectSchema.index({ category: 1 });
 projectSchema.index({ featured: -1, completionDate: -1 });
 projectSchema.index({ createdAt: -1 });
 
-// Virtual for image count
 projectSchema.virtual('imageCount').get(function () {
   return this.images ? this.images.length : 0;
 });
 
-// Pre-save hook to ensure image order is correct
 projectSchema.pre('save', function(next) {
   if (this.images && this.images.length > 0) {
     this.images.forEach((img, index) => {
@@ -128,9 +124,15 @@ projectSchema.pre('save', function(next) {
         img.order = index;
       }
     });
-    // Sort images by order
     this.images.sort((a, b) => a.order - b.order);
   }
+  
+  if (this.productsUsed) {
+    this.productsUsed = this.productsUsed.filter(product => 
+      product && typeof product === 'object' && product.name && product.name.trim()
+    );
+  }
+  
 });
 
 const Project = mongoose.model('Project', projectSchema);

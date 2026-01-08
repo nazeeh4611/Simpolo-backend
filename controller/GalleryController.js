@@ -190,6 +190,23 @@ export const updateGallery = async (req, res) => {
     const imageFiles = req.files?.images || [];
     const catalogFile = req.files?.catalog?.[0] || null;
 
+    /* ================= REMOVE CATALOG (IMPORTANT FIX) ================= */
+    if (req.body.removeCatalog === 'true' && galleryItem.catalog?.key) {
+      try {
+        const deleteCommand = new DeleteObjectCommand({
+          Bucket: process.env.AWS_BUCKET,
+          Key: galleryItem.catalog.key
+        });
+        await s3Client.send(deleteCommand);
+        console.log('Catalog removed from S3');
+      } catch (err) {
+        console.error('Failed to delete catalog from S3:', err.message);
+      }
+
+      galleryItem.catalog = null;
+      console.log('Catalog removed from DB');
+    }
+
     /* ================= ADD NEW IMAGES ================= */
     if (imageFiles.length > 0) {
       const newImages = imageFiles.map((file, index) => ({
@@ -262,6 +279,7 @@ export const updateGallery = async (req, res) => {
     });
   }
 };
+
 
 
 export const deleteGalleryImage = async (req, res) => {

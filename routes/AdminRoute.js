@@ -92,8 +92,16 @@ router.post("/admins/:adminId/reset-password", adminAuth, resetAdminPassword);
 router.get("/gallery/categories", adminAuth, getGalleryCategories);
 router.get("/gallery", adminAuth, getAllGallery);
 router.get("/gallery/:id", adminAuth, getGalleryById);
-router.post("/gallery", adminAuth, upload.array("files", 11), createGallery);
-router.put("/gallery/:id", adminAuth, upload.array("files", 11), updateGallery);
+router.post("/gallery", adminAuth, upload.fields([
+   { name: "images", maxCount: 10 },
+   { name: "catalog", maxCount: 1 }
+ ])
+ , createGallery);
+router.put("/gallery/:id", adminAuth, upload.fields([
+   { name: "images", maxCount: 10 },
+   { name: "catalog", maxCount: 1 }
+ ])
+ , updateGallery);
 router.delete("/gallery/:id/images/:imageIndex", adminAuth, deleteGalleryImage);
 router.delete("/gallery/:id/catalog", adminAuth, deleteGalleryCatalog);
 router.delete("/gallery/:id", adminAuth, deleteGallery);

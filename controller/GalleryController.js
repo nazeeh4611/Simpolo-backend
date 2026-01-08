@@ -110,31 +110,33 @@ export const getGalleryById = async (req, res) => {
 export const createGallery = async (req, res) => {
   try {
     console.log('Creating gallery item...');
-    console.log('Files received:', req.files?.length || 0);
+    console.log('Files received:', req.files);
 
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ 
+    const imageFiles = req.files?.images || [];
+    const catalogFile = req.files?.catalog?.[0] || null;
+
+    if (imageFiles.length === 0) {
+      return res.status(400).json({
         success: false,
-        message: 'At least one image is required' 
+        message: 'At least one image is required'
       });
     }
 
-    const images = req.files.filter(file => file.mimetype.startsWith('image/')).map((file, index) => {
-      return {
-        url: file.location,
-        key: file.key,
-        altText: req.body[`altText_${index}`] || '',
-        order: index
-      };
-    });
+    const images = imageFiles.map((file, index) => ({
+      url: file.location,
+      key: file.key,
+      altText: req.body[`altText_${index}`] || '',
+      order: index
+    }));
 
-    const catalogFile = req.files.find(file => file.mimetype === 'application/pdf');
-    const catalog = catalogFile ? {
-      url: catalogFile.location,
-      key: catalogFile.key,
-      filename: catalogFile.originalname,
-      size: catalogFile.size
-    } : null;
+    const catalog = catalogFile
+      ? {
+          url: catalogFile.location,
+          key: catalogFile.key,
+          filename: catalogFile.originalname,
+          size: catalogFile.size
+        }
+      : null;
 
     const galleryData = {
       title: req.body.title,
@@ -153,9 +155,9 @@ export const createGallery = async (req, res) => {
     };
 
     const galleryItem = await Gallery.create(galleryData);
-    
-    console.log('Gallery item created successfully:', galleryItem._id);
-    
+
+    console.log('Gallery item created:', galleryItem._id);
+
     res.status(201).json({
       success: true,
       message: 'Gallery item created successfully',
@@ -163,14 +165,14 @@ export const createGallery = async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating gallery item:', error);
-    
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: 'Error creating gallery item',
-      error: error.message 
+      error: error.message
     });
   }
 };
+
 
 export const updateGallery = async (req, res) => {
   try {
@@ -178,14 +180,19 @@ export const updateGallery = async (req, res) => {
 
     const galleryItem = await Gallery.findById(req.params.id);
     if (!galleryItem) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Gallery item not found' 
+        message: 'Gallery item not found'
       });
     }
 
-    if (req.files && req.files.length > 0) {
-      const newImages = req.files.filter(file => file.mimetype.startsWith('image/')).map((file, index) => ({
+    // Multer fields()
+    const imageFiles = req.files?.images || [];
+    const catalogFile = req.files?.catalog?.[0] || null;
+
+    /* ================= ADD NEW IMAGES ================= */
+    if (imageFiles.length > 0) {
+      const newImages = imageFiles.map((file, index) => ({
         url: file.location,
         key: file.key,
         altText: req.body[`altText_${index}`] || '',
@@ -194,32 +201,35 @@ export const updateGallery = async (req, res) => {
 
       galleryItem.images.push(...newImages);
       console.log(`Added ${newImages.length} new images`);
-
-      const catalogFile = req.files.find(file => file.mimetype === 'application/pdf');
-      if (catalogFile) {
-        if (galleryItem.catalog && galleryItem.catalog.key) {
-          try {
-            const deleteCommand = new DeleteObjectCommand({
-              Bucket: process.env.AWS_BUCKET,
-              Key: galleryItem.catalog.key
-            });
-            await s3Client.send(deleteCommand);
-            console.log('Old catalog deleted from S3');
-          } catch (s3Error) {
-            console.error('Error deleting old catalog from S3:', s3Error);
-          }
-        }
-
-        galleryItem.catalog = {
-          url: catalogFile.location,
-          key: catalogFile.key,
-          filename: catalogFile.originalname,
-          size: catalogFile.size
-        };
-        console.log('Catalog updated');
-      }
     }
 
+    /* ================= UPDATE CATALOG ================= */
+    if (catalogFile) {
+      // delete old catalog if exists
+      if (galleryItem.catalog?.key) {
+        try {
+          const deleteCommand = new DeleteObjectCommand({
+            Bucket: process.env.AWS_BUCKET,
+            Key: galleryItem.catalog.key
+          });
+          await s3Client.send(deleteCommand);
+          console.log('Old catalog deleted from S3');
+        } catch (err) {
+          console.error('Failed to delete old catalog:', err.message);
+        }
+      }
+
+      galleryItem.catalog = {
+        url: catalogFile.location,
+        key: catalogFile.key,
+        filename: catalogFile.originalname,
+        size: catalogFile.size
+      };
+
+      console.log('Catalog updated');
+    }
+
+    /* ================= UPDATE TEXT FIELDS ================= */
     galleryItem.title = req.body.title;
     galleryItem.description = req.body.description;
     galleryItem.category = req.body.category;
@@ -231,12 +241,13 @@ export const updateGallery = async (req, res) => {
       waterAbsorption: req.body.waterAbsorption || '',
       resistance: req.body.resistance || ''
     };
+
     galleryItem.updatedAt = new Date();
 
     await galleryItem.save();
-    
+
     console.log('Gallery item updated successfully');
-    
+
     res.json({
       success: true,
       message: 'Gallery item updated successfully',
@@ -244,13 +255,14 @@ export const updateGallery = async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating gallery item:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: 'Error updating gallery item',
-      error: error.message 
+      error: error.message
     });
   }
 };
+
 
 export const deleteGalleryImage = async (req, res) => {
   try {

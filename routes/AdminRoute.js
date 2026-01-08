@@ -7,9 +7,6 @@ import { fromEnv } from "@aws-sdk/credential-provider-env";
 
 import { adminAuth } from "../middleware/auth.js";
 
-/* ===========================
-   AUTH CONTROLLERS
-=========================== */
 import {
   registerAdmin,
   loginAdmin,
@@ -21,14 +18,8 @@ import {
   getAllAdmins
 } from "../controller/AuthController.js";
 
-/* ===========================
-   DASHBOARD
-=========================== */
 import { getDashboardStats } from "../controller/DashboardController.js";
 
-/* ===========================
-   GALLERY
-=========================== */
 import {
   getGalleryCategories,
   getAllGallery,
@@ -36,12 +27,10 @@ import {
   createGallery,
   updateGallery,
   deleteGalleryImage,
+  deleteGalleryCatalog,
   deleteGallery,
 } from "../controller/GalleryController.js";
 
-/* ===========================
-   PROJECTS
-=========================== */
 import {
   getProjectCategories,
   getAllProjects,
@@ -55,17 +44,11 @@ import {
 dotenv.config();
 const router = express.Router();
 
-/* ===========================
-   AWS S3 CLIENT
-=========================== */
 const s3 = new S3Client({
   region: process.env.AWS_REGION,
   credentials: fromEnv(),
 });
 
-/* ===========================
-   MULTER S3 CONFIG
-=========================== */
 const upload = multer({
   storage: multerS3({
     s3,
@@ -75,23 +58,28 @@ const upload = multer({
       const folder = req.originalUrl.includes("/projects")
         ? "projects"
         : "gallery";
-      cb(null, `${folder}/${Date.now()}-${file.originalname}`);
+      const fileType = file.mimetype === 'application/pdf' ? 'catalogs' : 'images';
+      cb(null, `${folder}/${fileType}/${Date.now()}-${file.originalname}`);
     },
   }),
   limits: {
-    fileSize: 10 * 1024 * 1024,
-    files: 10,
+    fileSize: 20 * 1024 * 1024,
+    files: 11
   },
+  fileFilter: (req, file, cb) => {
+    const allowedImageTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
+    const allowedPdfTypes = ['application/pdf'];
+    
+    if (allowedImageTypes.includes(file.mimetype) || allowedPdfTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only images and PDFs are allowed.'));
+    }
+  }
 });
 
-/* ===========================
-   DASHBOARD
-=========================== */
 router.get("/dashboard", adminAuth, getDashboardStats);
 
-/* ===========================
-   AUTH
-=========================== */
 router.post("/seed", seedAdmins);
 router.post("/login", loginAdmin);
 router.post("/register", adminAuth, registerAdmin);
@@ -101,20 +89,15 @@ router.put("/profile", adminAuth, updateAdminProfile);
 router.get("/admins", adminAuth, getAllAdmins);
 router.post("/admins/:adminId/reset-password", adminAuth, resetAdminPassword);
 
-/* ===========================
-   GALLERY
-=========================== */
 router.get("/gallery/categories", adminAuth, getGalleryCategories);
 router.get("/gallery", adminAuth, getAllGallery);
 router.get("/gallery/:id", adminAuth, getGalleryById);
-router.post("/gallery", adminAuth, upload.array("images", 10), createGallery);
-router.put("/gallery/:id", adminAuth, upload.array("images", 10), updateGallery);
+router.post("/gallery", adminAuth, upload.array("files", 11), createGallery);
+router.put("/gallery/:id", adminAuth, upload.array("files", 11), updateGallery);
 router.delete("/gallery/:id/images/:imageIndex", adminAuth, deleteGalleryImage);
+router.delete("/gallery/:id/catalog", adminAuth, deleteGalleryCatalog);
 router.delete("/gallery/:id", adminAuth, deleteGallery);
 
-/* ===========================
-   PROJECTS
-=========================== */
 router.get("/projects/categories", adminAuth, getProjectCategories);
 router.get("/projects", adminAuth, getAllProjects);
 router.get("/projects/:id", adminAuth, getProjectById);

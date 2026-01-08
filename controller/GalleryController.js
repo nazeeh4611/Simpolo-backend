@@ -2,7 +2,6 @@ import Gallery from '../model/Gallery.js';
 import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { fromEnv } from '@aws-sdk/credential-provider-env';
 
-// Initialize S3 client
 const s3Client = new S3Client({
   region: process.env.AWS_REGION,
   credentials: fromEnv(),
@@ -22,9 +21,6 @@ const galleryCategories = [
   'Bathroom Fittings'
 ];
 
-// ==========================================
-// GET GALLERY CATEGORIES
-// ==========================================
 export const getGalleryCategories = async (_, res) => {
   try {
     res.json({
@@ -40,9 +36,6 @@ export const getGalleryCategories = async (_, res) => {
   }
 };
 
-// ==========================================
-// GET ALL GALLERY ITEMS
-// ==========================================
 export const getAllGallery = async (req, res) => {
   try {
     const { page = 1, limit = 10, category, search } = req.query;
@@ -89,9 +82,6 @@ export const getAllGallery = async (req, res) => {
   }
 };
 
-// ==========================================
-// GET GALLERY ITEM BY ID
-// ==========================================
 export const getGalleryById = async (req, res) => {
   try {
     const item = await Gallery.findById(req.params.id);
@@ -117,16 +107,11 @@ export const getGalleryById = async (req, res) => {
   }
 };
 
-// ==========================================
-// CREATE GALLERY ITEM
-// ==========================================
 export const createGallery = async (req, res) => {
   try {
-    console.log('📝 Creating gallery item...');
-    console.log('Request body:', req.body);
+    console.log('Creating gallery item...');
     console.log('Files received:', req.files?.length || 0);
 
-    // Validate files
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ 
         success: false,
@@ -134,14 +119,7 @@ export const createGallery = async (req, res) => {
       });
     }
 
-    // Extract image URLs from multer-s3
-    const images = req.files.map((file, index) => {
-      console.log(`Processing file ${index}:`, {
-        location: file.location,
-        key: file.key,
-        originalname: file.originalname
-      });
-
+    const images = req.files.filter(file => file.mimetype.startsWith('image/')).map((file, index) => {
       return {
         url: file.location,
         key: file.key,
@@ -150,14 +128,20 @@ export const createGallery = async (req, res) => {
       };
     });
 
-    console.log('Images processed:', images.length);
+    const catalogFile = req.files.find(file => file.mimetype === 'application/pdf');
+    const catalog = catalogFile ? {
+      url: catalogFile.location,
+      key: catalogFile.key,
+      filename: catalogFile.originalname,
+      size: catalogFile.size
+    } : null;
 
-    // Prepare gallery data
     const galleryData = {
       title: req.body.title,
       description: req.body.description,
       category: req.body.category,
       images,
+      catalog,
       specifications: {
         size: req.body.size || '',
         finish: req.body.finish || '',
@@ -168,15 +152,9 @@ export const createGallery = async (req, res) => {
       }
     };
 
-    console.log('Creating gallery item with data:', {
-      ...galleryData,
-      images: `${galleryData.images.length} images`
-    });
-
-    // Create gallery item
     const galleryItem = await Gallery.create(galleryData);
     
-    console.log('✅ Gallery item created successfully:', galleryItem._id);
+    console.log('Gallery item created successfully:', galleryItem._id);
     
     res.status(201).json({
       success: true,
@@ -184,7 +162,7 @@ export const createGallery = async (req, res) => {
       data: galleryItem
     });
   } catch (error) {
-    console.error('❌ Error creating gallery item:', error);
+    console.error('Error creating gallery item:', error);
     
     res.status(500).json({ 
       success: false,
@@ -194,14 +172,9 @@ export const createGallery = async (req, res) => {
   }
 };
 
-// ==========================================
-// UPDATE GALLERY ITEM
-// ==========================================
 export const updateGallery = async (req, res) => {
   try {
-    console.log('📝 Updating gallery item:', req.params.id);
-    console.log('Request body:', req.body);
-    console.log('New files:', req.files?.length || 0);
+    console.log('Updating gallery item:', req.params.id);
 
     const galleryItem = await Gallery.findById(req.params.id);
     if (!galleryItem) {
@@ -211,9 +184,8 @@ export const updateGallery = async (req, res) => {
       });
     }
 
-    // Add new images if provided
     if (req.files && req.files.length > 0) {
-      const newImages = req.files.map((file, index) => ({
+      const newImages = req.files.filter(file => file.mimetype.startsWith('image/')).map((file, index) => ({
         url: file.location,
         key: file.key,
         altText: req.body[`altText_${index}`] || '',
@@ -222,9 +194,32 @@ export const updateGallery = async (req, res) => {
 
       galleryItem.images.push(...newImages);
       console.log(`Added ${newImages.length} new images`);
+
+      const catalogFile = req.files.find(file => file.mimetype === 'application/pdf');
+      if (catalogFile) {
+        if (galleryItem.catalog && galleryItem.catalog.key) {
+          try {
+            const deleteCommand = new DeleteObjectCommand({
+              Bucket: process.env.AWS_BUCKET,
+              Key: galleryItem.catalog.key
+            });
+            await s3Client.send(deleteCommand);
+            console.log('Old catalog deleted from S3');
+          } catch (s3Error) {
+            console.error('Error deleting old catalog from S3:', s3Error);
+          }
+        }
+
+        galleryItem.catalog = {
+          url: catalogFile.location,
+          key: catalogFile.key,
+          filename: catalogFile.originalname,
+          size: catalogFile.size
+        };
+        console.log('Catalog updated');
+      }
     }
 
-    // Update gallery fields
     galleryItem.title = req.body.title;
     galleryItem.description = req.body.description;
     galleryItem.category = req.body.category;
@@ -240,7 +235,7 @@ export const updateGallery = async (req, res) => {
 
     await galleryItem.save();
     
-    console.log('✅ Gallery item updated successfully');
+    console.log('Gallery item updated successfully');
     
     res.json({
       success: true,
@@ -248,7 +243,7 @@ export const updateGallery = async (req, res) => {
       data: galleryItem
     });
   } catch (error) {
-    console.error('❌ Error updating gallery item:', error);
+    console.error('Error updating gallery item:', error);
     res.status(500).json({ 
       success: false,
       message: 'Error updating gallery item',
@@ -257,9 +252,6 @@ export const updateGallery = async (req, res) => {
   }
 };
 
-// ==========================================
-// DELETE GALLERY IMAGE
-// ==========================================
 export const deleteGalleryImage = async (req, res) => {
   try {
     const galleryItem = await Gallery.findById(req.params.id);
@@ -278,33 +270,29 @@ export const deleteGalleryImage = async (req, res) => {
       });
     }
 
-    // Delete from S3
     const imageToDelete = galleryItem.images[index];
-    console.log('🗑️ Deleting image from S3:', imageToDelete.key);
+    console.log('Deleting image from S3:', imageToDelete.key);
 
     try {
       const deleteCommand = new DeleteObjectCommand({
-        Bucket: process.env.AWS_GALLERY_BUCKET || process.env.AWS_PROPERTY_BUCKET,
+        Bucket: process.env.AWS_BUCKET,
         Key: imageToDelete.key
       });
       await s3Client.send(deleteCommand);
-      console.log('✅ Image deleted from S3');
+      console.log('Image deleted from S3');
     } catch (s3Error) {
-      console.error('⚠️ Error deleting from S3:', s3Error);
-      // Continue anyway to remove from database
+      console.error('Error deleting from S3:', s3Error);
     }
 
-    // Remove from array
     galleryItem.images.splice(index, 1);
     
-    // Re-order remaining images
     galleryItem.images.forEach((img, idx) => {
       img.order = idx;
     });
 
     await galleryItem.save();
 
-    console.log('✅ Image removed from gallery item');
+    console.log('Image removed from gallery item');
     
     res.json({ 
       success: true,
@@ -312,7 +300,7 @@ export const deleteGalleryImage = async (req, res) => {
       deleted: true 
     });
   } catch (error) {
-    console.error('❌ Error deleting gallery image:', error);
+    console.error('Error deleting gallery image:', error);
     res.status(500).json({ 
       success: false,
       message: 'Error deleting gallery image',
@@ -321,9 +309,56 @@ export const deleteGalleryImage = async (req, res) => {
   }
 };
 
-// ==========================================
-// DELETE GALLERY ITEM
-// ==========================================
+export const deleteGalleryCatalog = async (req, res) => {
+  try {
+    const galleryItem = await Gallery.findById(req.params.id);
+    if (!galleryItem) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Gallery item not found' 
+      });
+    }
+
+    if (!galleryItem.catalog) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'No catalog found for this item' 
+      });
+    }
+
+    console.log('Deleting catalog from S3:', galleryItem.catalog.key);
+
+    try {
+      const deleteCommand = new DeleteObjectCommand({
+        Bucket: process.env.AWS_BUCKET,
+        Key: galleryItem.catalog.key
+      });
+      await s3Client.send(deleteCommand);
+      console.log('Catalog deleted from S3');
+    } catch (s3Error) {
+      console.error('Error deleting catalog from S3:', s3Error);
+    }
+
+    galleryItem.catalog = null;
+    await galleryItem.save();
+
+    console.log('Catalog removed from gallery item');
+    
+    res.json({ 
+      success: true,
+      message: 'Catalog deleted successfully',
+      deleted: true 
+    });
+  } catch (error) {
+    console.error('Error deleting gallery catalog:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error deleting gallery catalog',
+      error: error.message 
+    });
+  }
+};
+
 export const deleteGallery = async (req, res) => {
   try {
     const galleryItem = await Gallery.findById(req.params.id);
@@ -334,27 +369,37 @@ export const deleteGallery = async (req, res) => {
       });
     }
 
-    // Delete all images from S3
-    console.log(`🗑️ Deleting ${galleryItem.images.length} images from S3`);
+    console.log(`Deleting ${galleryItem.images.length} images from S3`);
     
     for (const img of galleryItem.images) {
       try {
         const deleteCommand = new DeleteObjectCommand({
-          Bucket: process.env.AWS_GALLERY_BUCKET || process.env.AWS_PROPERTY_BUCKET,
+          Bucket: process.env.AWS_BUCKET,
           Key: img.key
         });
         await s3Client.send(deleteCommand);
-        console.log('✅ Deleted:', img.key);
+        console.log('Deleted:', img.key);
       } catch (error) {
-        console.error('⚠️ Error deleting image:', img.key, error.message);
-        // Continue with other deletions
+        console.error('Error deleting image:', img.key, error.message);
       }
     }
 
-    // Delete gallery item
+    if (galleryItem.catalog && galleryItem.catalog.key) {
+      try {
+        const deleteCommand = new DeleteObjectCommand({
+          Bucket: process.env.AWS_BUCKET,
+          Key: galleryItem.catalog.key
+        });
+        await s3Client.send(deleteCommand);
+        console.log('Deleted catalog:', galleryItem.catalog.key);
+      } catch (error) {
+        console.error('Error deleting catalog:', error.message);
+      }
+    }
+
     await galleryItem.deleteOne();
     
-    console.log('✅ Gallery item deleted successfully');
+    console.log('Gallery item deleted successfully');
     
     res.json({ 
       success: true,
@@ -362,7 +407,7 @@ export const deleteGallery = async (req, res) => {
       deleted: true 
     });
   } catch (error) {
-    console.error('❌ Error deleting gallery item:', error);
+    console.error('Error deleting gallery item:', error);
     res.status(500).json({ 
       success: false,
       message: 'Error deleting gallery item',

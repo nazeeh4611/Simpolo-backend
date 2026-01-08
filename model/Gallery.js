@@ -44,6 +44,25 @@ const gallerySchema = new mongoose.Schema(
       }
     ],
 
+    catalog: {
+      url: {
+        type: String
+      },
+      key: {
+        type: String
+      },
+      filename: {
+        type: String
+      },
+      size: {
+        type: Number
+      },
+      uploadedAt: {
+        type: Date,
+        default: Date.now
+      }
+    },
+
     specifications: {
       type: Object
     },
@@ -66,14 +85,16 @@ const gallerySchema = new mongoose.Schema(
   }
 );
 
-/* Indexes */
 gallerySchema.index({ title: 'text', description: 'text' });
 gallerySchema.index({ category: 1 });
 gallerySchema.index({ featured: -1, createdAt: -1 });
 
-/* Virtuals */
 gallerySchema.virtual('imageCount').get(function () {
   return this.images.length;
+});
+
+gallerySchema.virtual('hasCatalog').get(function () {
+  return !!this.catalog;
 });
 
 const Gallery = mongoose.model('Gallery', gallerySchema);
